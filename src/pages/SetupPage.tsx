@@ -4,8 +4,27 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Download, CheckCheck, Loader } from "lucide-react";
 import { HeroSelectModal } from "../components/HeroSelectModal";
 import type { Hero } from "../types";
+
+const CACHE_NAME = "dotaspy-v1";
+
+type CacheStatus = "idle" | "loading" | "done" | "error";
+
+async function cacheAllHeroes(
+  heroes: Hero[],
+  onProgress: (n: number) => void
+): Promise<void> {
+  const cache = await caches.open(CACHE_NAME);
+  for (let i = 0; i < heroes.length; i++) {
+    const url = `/heroes/${heroes[i]!.slug}.png`;
+    if (!(await cache.match(url))) {
+      await cache.add(url);
+    }
+    onProgress(i + 1);
+  }
+}
 
 interface Props {
   playerCount: number;
@@ -38,6 +57,20 @@ export function SetupPage({
   const [spies, setSpies] = useState(spyCount);
   const [hints, setHints] = useState(hintsEnabled);
   const [heroModalOpen, setHeroModalOpen] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState<CacheStatus>("idle");
+  const [cacheProgress, setCacheProgress] = useState(0);
+
+  async function handleCacheAll() {
+    if (cacheStatus === "loading") return;
+    setCacheStatus("loading");
+    setCacheProgress(0);
+    try {
+      await cacheAllHeroes(allHeroes, setCacheProgress);
+      setCacheStatus("done");
+    } catch {
+      setCacheStatus("error");
+    }
+  }
 
   const maxSpies = players - 2;
   const effectiveSpies = Math.min(spies, maxSpies);
@@ -145,6 +178,35 @@ export function SetupPage({
               <Badge variant="secondary">{allHeroes.length} всего</Badge>
             </Button>
           </div>
+
+          {"caches" in window && (
+            <Button
+              variant="outline"
+              className="w-full justify-between"
+              onClick={handleCacheAll}
+              disabled={cacheStatus === "loading" || cacheStatus === "done"}
+            >
+              <span className="flex items-center gap-2">
+                {cacheStatus === "loading" ? (
+                  <Loader className="h-4 w-4 animate-spin" />
+                ) : cacheStatus === "done" ? (
+                  <CheckCheck className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {cacheStatus === "loading"
+                  ? `Загрузка... ${cacheProgress}/${allHeroes.length}`
+                  : cacheStatus === "done"
+                  ? "Готово к офлайну"
+                  : cacheStatus === "error"
+                  ? "Ошибка, попробуй ещё раз"
+                  : "Скачать для офлайна"}
+              </span>
+              {cacheStatus === "idle" && (
+                <span className="text-xs text-muted-foreground">~9 MB</span>
+              )}
+            </Button>
+          )}
 
           <Button
             className="w-full"
