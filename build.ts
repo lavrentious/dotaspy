@@ -28,11 +28,26 @@ console.log(` public/heroes → dist/heroes`);
 await Bun.$`cp -r public/icons dist/icons`;
 console.log(` public/icons  → dist/icons`);
 
+// Build precache URL list: app shell assets + all icons (small enough to precache eagerly).
+// Hero images (~68 KB each × 127) are left to lazy caching to avoid a huge install payload.
+const shellUrls = result.outputs
+  .filter((o) => !o.path.endsWith(".map"))
+  .map((o) => "/" + path.relative(outdir, o.path));
+
+const iconUrls = [...new Bun.Glob("*.png").scanSync("public/icons")]
+  .map((f) => `/icons/${f}`);
+
+const precacheUrls = ["/", ...shellUrls, ...iconUrls];
+
 await Bun.build({
   entrypoints: ["src/sw.ts"],
   outdir,
   target: "browser",
   minify: true,
-  define: { "process.env.NODE_ENV": JSON.stringify("production") },
+  define: {
+    "process.env.NODE_ENV": JSON.stringify("production"),
+    "__PRECACHE_URLS__": JSON.stringify(precacheUrls),
+  },
 });
-console.log(` dist/sw.js`);
+
+console.log(` dist/sw.js  (precaching ${precacheUrls.length} urls)`);
