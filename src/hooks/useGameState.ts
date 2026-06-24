@@ -13,10 +13,8 @@ function shuffle<T>(arr: T[]): T[] {
   return a as T[];
 }
 
-function pickUniqueHints(hero: Hero, count: number): string[] {
-  // Hints ordered: role → lane → items → matchups → attribute → attack
-  // Pick `count` from the front (most informative first)
-  return hero.hints.slice(0, count);
+function pickRandomHints(hero: Hero, count: number): string[] {
+  return shuffle([...hero.hints]).slice(0, count);
 }
 
 export function useGameState() {
@@ -67,7 +65,7 @@ export function useGameState() {
       // Assign spy hints for leading consecutive spies (if hints enabled)
       const spyHintAssignments = new Map<number, string>();
       if (hintsEnabled && consecutiveLeadingSpies > 0) {
-        const availableHints = pickUniqueHints(hero, consecutiveLeadingSpies + 3);
+        const availableHints = pickRandomHints(hero, consecutiveLeadingSpies + 3);
         // Give leading spies hints in speaking order
         let hintIdx = 0;
         for (let i = 0; i < consecutiveLeadingSpies; i++) {

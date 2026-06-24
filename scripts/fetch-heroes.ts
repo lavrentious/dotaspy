@@ -242,11 +242,11 @@ async function main() {
         .map((m) => ({ id: m.hero_id, rate: m.wins / m.games_played }))
         .sort((a, b) => b.rate - a.rate);
       bestVs = ranked
-        .slice(0, 3)
+        .slice(0, 1)
         .map((m) => heroById.get(m.id) ?? "")
         .filter(Boolean);
       worstVs = ranked
-        .slice(-3)
+        .slice(-1)
         .reverse()
         .map((m) => heroById.get(m.id) ?? "")
         .filter(Boolean);
