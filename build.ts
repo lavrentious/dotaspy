@@ -27,3 +27,12 @@ await Bun.$`cp -r public/heroes dist/heroes`;
 console.log(` public/heroes → dist/heroes`);
 await Bun.$`cp -r public/icons dist/icons`;
 console.log(` public/icons  → dist/icons`);
+
+await Bun.build({
+  entrypoints: ["src/sw.ts"],
+  outdir,
+  target: "browser",
+  minify: true,
+  define: { "process.env.NODE_ENV": JSON.stringify("production") },
+});
+console.log(` dist/sw.js`);
