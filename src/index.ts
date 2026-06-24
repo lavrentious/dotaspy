@@ -3,10 +3,8 @@ import index from "./index.html";
 
 const server = serve({
   routes: {
-    "/heroes/:slug": (req) => {
-      const file = Bun.file(`./public/heroes/${req.params.slug}`);
-      return new Response(file);
-    },
+    "/heroes/:slug": (req) => new Response(Bun.file(`./public/heroes/${req.params.slug}`)),
+    "/icons/:slug": (req) => new Response(Bun.file(`./public/icons/${req.params.slug}`)),
 
     "/*": index,
   },

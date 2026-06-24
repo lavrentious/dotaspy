@@ -25,3 +25,5 @@ for (const output of result.outputs) {
 
 await Bun.$`cp -r public/heroes dist/heroes`;
 console.log(` public/heroes → dist/heroes`);
+await Bun.$`cp -r public/icons dist/icons`;
+console.log(` public/icons  → dist/icons`);

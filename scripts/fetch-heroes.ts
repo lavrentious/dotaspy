@@ -8,6 +8,8 @@
 const OPENDOTA = "https://api.opendota.com/api";
 const CDN_HORIZONTAL = (slug: string) =>
   `https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/${slug}.png`;
+const CDN_ICON = (slug: string) =>
+  `https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/icons/${slug}.png`;
 
 interface ItemData {
   id?: number;
@@ -142,6 +144,7 @@ function isComplete(h: Hero): boolean {
 
 async function main() {
   await Bun.write("public/heroes/.keep", "");
+  await Bun.write("public/icons/.keep", "");
   await Bun.write("src/data/.keep", "");
 
   console.log("Fetching hero list...");
@@ -190,6 +193,11 @@ async function main() {
     const imgPath = `public/heroes/${slug}.png`;
     if (!(await fileExists(imgPath))) {
       await downloadImage(CDN_HORIZONTAL(slug), imgPath);
+    }
+
+    const iconPath = `public/icons/${slug}.png`;
+    if (!(await fileExists(iconPath))) {
+      await downloadImage(CDN_ICON(slug), iconPath);
     }
 
     if (prev && isComplete(prev)) {
