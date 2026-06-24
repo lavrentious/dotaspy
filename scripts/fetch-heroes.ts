@@ -40,16 +40,13 @@ const ATTACK_RU: Record<string, string> = {
   Ranged: "дальней дистанции",
 };
 
-const LANE_BY_ROLE: Record<string, string> = {
-  Carry: "Carry",
-  Nuker: "Nuker",
-  Disabler: "Disabler",
-  Jungle: "Jungle",
-  Durable: "Durable",
-  Escape: "Escape",
-  Pusher: "Pusher",
-  Initiator: "Initiator",
-  Support: "Support",
+// lane_role 1=Safelane, 2=Mid, 3=Offlane, 4=Jungle/Roaming
+// Note: safelane (1) includes both pos-1 carry and pos-5 support who lane there
+const LANE_NAMES_RU: Record<number, string> = {
+  1: "безопасной линии",
+  2: "средней линии",
+  3: "сложной линии",
+  4: "лесу или роуминге",
 };
 
 function deriveHint(type: string, value: string): string {
@@ -60,8 +57,6 @@ function deriveHint(type: string, value: string): string {
       return `Этот герой сражается в ${ATTACK_RU[value] ?? value}`;
     case "role":
       return `Этот герой чаще всего играет роль ${value}`;
-    case "lane":
-      return `Этот герой обычно играет на ${value}`;
     case "item":
       return `Этот герой часто собирает ${value}`;
     case "best_vs":
@@ -71,6 +66,32 @@ function deriveHint(type: string, value: string): string {
     default:
       return value;
   }
+}
+
+function deriveLaneHint(
+  heroId: number,
+  laneGames: Map<string, number>
+): string | null {
+  const entries = [1, 2, 3, 4].map((lane) => ({
+    lane,
+    games: laneGames.get(`${heroId}_${lane}`) ?? 0,
+  }));
+  const total = entries.reduce((s, e) => s + e.games, 0);
+  if (total === 0) return null;
+
+  entries.sort((a, b) => b.games - a.games);
+  const [primary, secondary] = entries;
+  const primaryName = LANE_NAMES_RU[primary!.lane];
+  if (!primaryName) return null;
+
+  if (secondary && secondary.games / total > 0.25) {
+    const secondaryName = LANE_NAMES_RU[secondary.lane];
+    if (secondaryName) {
+      return `Этот герой часто играет на ${primaryName} или на ${secondaryName}`;
+    }
+  }
+
+  return `Этот герой чаще всего играет на ${primaryName}`;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -124,6 +145,14 @@ interface OdMatchup {
   wins: number;
 }
 
+interface OdLaneRole {
+  hero_id: number;
+  lane_role: number;
+  time: number;
+  games: string;
+  wins: string;
+}
+
 interface Hero {
   id: number;
   slug: string;
@@ -154,6 +183,17 @@ async function main() {
   const itemsConst = await fetchJson<Record<string, ItemData>>(
     `${OPENDOTA}/constants/items`,
   );
+
+  console.log("Fetching lane role data...");
+  const laneRoleRows = await fetchJson<OdLaneRole[]>(
+    `${OPENDOTA}/scenarios/laneRoles`,
+  );
+  const laneGames = new Map<string, number>();
+  for (const row of laneRoleRows) {
+    const key = `${row.hero_id}_${row.lane_role}`;
+    laneGames.set(key, (laneGames.get(key) ?? 0) + parseInt(row.games));
+  }
+  console.log(`  ${laneRoleRows.length} rows across ${new Set(laneRoleRows.map((r) => r.hero_id)).size} heroes`);
 
   const itemById = new Map<number, string>();
   const itemKeyById = new Map<number, string>();
@@ -258,8 +298,8 @@ async function main() {
     const hints: string[] = [];
     for (const role of h.roles.slice(0, 2))
       hints.push(deriveHint("role", role));
-    const lane = LANE_BY_ROLE[h.roles[0] ?? ""];
-    if (lane) hints.push(deriveHint("lane", lane));
+    const laneHint = deriveLaneHint(h.id, laneGames);
+    if (laneHint) hints.push(laneHint);
     for (const item of topItems) hints.push(deriveHint("item", item));
     for (const name of bestVs) hints.push(deriveHint("best_vs", name));
     for (const name of worstVs) hints.push(deriveHint("worst_vs", name));
@@ -275,6 +315,25 @@ async function main() {
       roles: h.roles,
       hints,
     });
+  }
+
+  // Add lane hints to existing (skipped) heroes that don't have them yet.
+  // This runs without any API calls — uses the already-fetched laneGames data.
+  let laneAdded = 0;
+  for (const hero of result) {
+    const hasLane = hero.hints.some(
+      (s) => s.includes("линии") || s.includes("лесу"),
+    );
+    if (!hasLane) {
+      const hint = deriveLaneHint(hero.id, laneGames);
+      if (hint) {
+        hero.hints.push(hint);
+        laneAdded++;
+      }
+    }
+  }
+  if (laneAdded > 0) {
+    console.log(`\nAdded lane hints to ${laneAdded} existing heroes.`);
   }
 
   console.log("\nWriting src/data/heroes.json...");
